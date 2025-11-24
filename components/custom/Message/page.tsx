@@ -22,6 +22,96 @@ import SystemMessage from '@/components/custom/SystemMessage/page';
 
 const STORAGE_KEY = 'system-message';
 
+// Separate component that uses useChat - will remount when key changes
+const ChatInterface = ({ systemMessage }: { systemMessage: string }) => {
+  // Create transport with system message in body
+  const transport = useMemo(() => {
+    return new DefaultChatTransport({
+      api: '/api/chat',
+      body: {
+        systemMessage: systemMessage,
+      },
+    });
+  }, [systemMessage]);
+
+  const { messages, sendMessage, status, regenerate } = useChat({
+    transport,
+  });
+  const { textInput } = usePromptInputController();
+  const handleSubmit = async (message: { text: string; files: any[] }, e: React.FormEvent) => {
+    if (message.text.trim()) {
+      sendMessage({ text: message.text });
+    }
+  };
+
+  // useEffect(() => {
+  //   console.log(status);
+  // }, [status]);
+  
+  return (
+    <>
+      <Conversation>
+        <ConversationContent>
+          {messages.map((message, messageIndex) => (
+            <Fragment key={message.id}>
+              {message.parts.map((part, i) => {
+                switch (part.type) {
+                  case 'text':
+                    const isLastMessage =
+                      messageIndex === messages.length - 1;
+                    return (
+                      <Fragment key={`${message.id}-${i}`}>
+                        <Message from={message.role}>
+                          <MessageContent>
+                            <MessageResponse>{part.text}</MessageResponse>
+                          </MessageContent>
+                        </Message>
+                        {message.role === 'assistant' && isLastMessage && (
+                          <MessageActions>
+                            <MessageAction
+                              onClick={() => regenerate()}
+                              label="Retry"
+                            >
+                              <RefreshCcwIcon className="size-3" />
+                            </MessageAction>
+                            <MessageAction
+                              onClick={() =>
+                                navigator.clipboard.writeText(part.text)
+                              }
+                              label="Copy"
+                            >
+                              <CopyIcon className="size-3" />
+                            </MessageAction>
+                          </MessageActions>
+                        )}
+                      </Fragment>
+                    );
+                  default:
+                    return null;
+                }
+              })}
+            </Fragment>
+          ))}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
+      <PromptInput
+        onSubmit={handleSubmit}
+        className="mt-4 w-full max-w-2xl mx-auto relative"
+      >
+        <PromptInputTextarea
+          placeholder="Say something..."
+          className="pr-12"
+        />
+        <PromptInputSubmit
+          status={status}
+          disabled={!textInput.value.trim()}
+          className="absolute bottom-1 right-1"
+        />
+      </PromptInput>
+    </>
+  );
+};
 
 const MessagePageContent = () => {
   // Get system message from localStorage and keep it in state
@@ -52,90 +142,14 @@ const MessagePageContent = () => {
     };
   }, []);
 
-  // Create transport with system message in body
-  const transport = useMemo(() => {
-    return new DefaultChatTransport({
-      api: '/api/chat',
-      body: {
-        systemMessage: systemMessage,
-      },
-    });
-  }, [systemMessage]);
-
-  const { messages, sendMessage, status, regenerate } = useChat({
-    transport,
-  });
-  const { textInput } = usePromptInputController();
-  const handleSubmit = async (message: { text: string; files: any[] }, e: React.FormEvent) => {
-    if (message.text.trim()) {
-      sendMessage({ text: message.text });
-    }
-  };
   return (
     <div className="max-w-4xl mx-auto p-6 relative w-full h-full rounded-lg border">
       <div className="flex flex-col h-full">
         <div className="flex justify-end mb-4">
           <SystemMessage />
         </div>
-        <Conversation>
-          <ConversationContent>
-            {messages.map((message, messageIndex) => (
-              <Fragment key={message.id}>
-                {message.parts.map((part, i) => {
-                  switch (part.type) {
-                    case 'text':
-                      const isLastMessage =
-                        messageIndex === messages.length - 1;
-                      return (
-                        <Fragment key={`${message.id}-${i}`}>
-                          <Message from={message.role}>
-                            <MessageContent>
-                              <MessageResponse>{part.text}</MessageResponse>
-                            </MessageContent>
-                          </Message>
-                          {message.role === 'assistant' && isLastMessage && (
-                            <MessageActions>
-                              <MessageAction
-                                onClick={() => regenerate()}
-                                label="Retry"
-                              >
-                                <RefreshCcwIcon className="size-3" />
-                              </MessageAction>
-                              <MessageAction
-                                onClick={() =>
-                                  navigator.clipboard.writeText(part.text)
-                                }
-                                label="Copy"
-                              >
-                                <CopyIcon className="size-3" />
-                              </MessageAction>
-                            </MessageActions>
-                          )}
-                        </Fragment>
-                      );
-                    default:
-                      return null;
-                  }
-                })}
-              </Fragment>
-            ))}
-          </ConversationContent>
-          <ConversationScrollButton />
-        </Conversation>
-        <PromptInput
-          onSubmit={handleSubmit}
-          className="mt-4 w-full max-w-2xl mx-auto relative"
-        >
-          <PromptInputTextarea
-            placeholder="Say something..."
-            className="pr-12"
-          />
-          <PromptInputSubmit
-            status={status === 'streaming' ? 'streaming' : 'ready'}
-            disabled={!textInput.value.trim()}
-            className="absolute bottom-1 right-1"
-          />
-        </PromptInput>
+        {/* Key prop forces remount when systemMessage changes, ensuring useChat uses new transport */}
+        <ChatInterface key={systemMessage} systemMessage={systemMessage} />
       </div>
     </div>
   );
