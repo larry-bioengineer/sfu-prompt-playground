@@ -14,11 +14,13 @@ import {
   usePromptInputController,
 } from '@/components/ai-elements/prompt-input';
 import { MessageResponse } from '@/components/ai-elements/message';
-import { RefreshCcwIcon, CopyIcon } from 'lucide-react';
+import { RefreshCcwIcon, CopyIcon, QrCode } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import SystemMessage from '@/components/custom/SystemMessage/page';
+import QRCodeDialog from '@/components/custom/QRCodeDialog/page';
+import { Button } from '@/components/ui/button';
 
 // Separate component that uses useChat - will remount when key changes
 const ChatInterface = ({ systemMessage }: { systemMessage: string }) => {
@@ -114,6 +116,7 @@ const ChatInterface = ({ systemMessage }: { systemMessage: string }) => {
 const MessagePageContent = ({ chatId }: { chatId: string }) => {
   const [systemMessage, setSystemMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [qrCodeOpen, setQrCodeOpen] = useState(false);
 
   // Fetch system message from API on mount and when chatId changes
   useEffect(() => {
@@ -173,12 +176,22 @@ const MessagePageContent = ({ chatId }: { chatId: string }) => {
   return (
     <div className="max-w-4xl mx-auto p-6 relative w-full h-full rounded-lg border">
       <div className="flex flex-col h-full">
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-end gap-2 mb-4">
+          <Button
+            onClick={() => setQrCodeOpen(true)}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <QrCode className="size-4" />
+            Share QR Code
+          </Button>
           <SystemMessage chatId={chatId} />
         </div>
         {/* Key prop forces remount when systemMessage changes, ensuring useChat uses new transport */}
         {!isLoading && <ChatInterface key={systemMessage} systemMessage={systemMessage} />}
       </div>
+      <QRCodeDialog open={qrCodeOpen} onClose={setQrCodeOpen} />
     </div>
   );
 };

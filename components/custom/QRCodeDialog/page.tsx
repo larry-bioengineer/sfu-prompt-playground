@@ -1,11 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react'
 import { QRCodeSVG } from 'qrcode.react'
 
-export default function QRCodeDialog() {
-  const [open, setOpen] = useState(false)
+interface QRCodeDialogProps {
+  open: boolean
+  onClose: (value: boolean) => void
+}
+
+export default function QRCodeDialog({ open, onClose }: QRCodeDialogProps) {
   const [currentUrl, setCurrentUrl] = useState('')
 
   useEffect(() => {
@@ -16,15 +20,7 @@ export default function QRCodeDialog() {
   }, [])
 
   return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed top-4 left-4 z-50 rounded-md bg-gray-950/5 px-2.5 py-1.5 text-sm font-semibold text-gray-900 hover:bg-gray-950/10 dark:bg-white/10 dark:text-white dark:ring-1 dark:ring-inset dark:ring-white/5 dark:hover:bg-white/20"
-      >
-        Share QR Code
-      </button>
-
-      <Dialog open={open} onClose={setOpen} className="relative z-50">
+    <Dialog open={open} onClose={onClose} className="relative z-50">
         <DialogBackdrop
           transition
           className="fixed inset-0 bg-gray-500/75 transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in dark:bg-gray-900/50"
@@ -78,7 +74,7 @@ export default function QRCodeDialog() {
               <div className="mt-5 sm:mt-6">
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={() => onClose(false)}
                   className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:bg-indigo-500 dark:shadow-none dark:hover:bg-indigo-400 dark:focus-visible:outline-indigo-500"
                 >
                   Close
@@ -88,7 +84,6 @@ export default function QRCodeDialog() {
           </div>
         </div>
       </Dialog>
-    </>
   )
 }
 
