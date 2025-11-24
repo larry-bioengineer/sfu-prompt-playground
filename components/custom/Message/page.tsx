@@ -16,9 +16,54 @@ import {
 import { MessageResponse } from '@/components/ai-elements/message';
 import { RefreshCcwIcon, CopyIcon } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
-import { Fragment } from 'react';
+import { DefaultChatTransport } from 'ai';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import SystemMessage from '@/components/custom/SystemMessage/page';
+
+const STORAGE_KEY = 'system-message';
+
 const MessagePageContent = () => {
-  const { messages, sendMessage, status, regenerate } = useChat();
+  // Get system message from localStorage and keep it in state
+  const [systemMessage, setSystemMessage] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(STORAGE_KEY) || '';
+    }
+    return '';
+  });
+
+  // Listen for storage changes to update system message
+  useEffect(() => {
+    const handleStorageChange = () => {
+      if (typeof window !== 'undefined') {
+        setSystemMessage(localStorage.getItem(STORAGE_KEY) || '');
+      }
+    };
+
+    // Listen for storage events (when localStorage is updated from another tab/window)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom events (when localStorage is updated in the same tab)
+    window.addEventListener('systemMessageUpdated', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('systemMessageUpdated', handleStorageChange);
+    };
+  }, []);
+
+  // Create transport with system message in body
+  const transport = useMemo(() => {
+    return new DefaultChatTransport({
+      api: '/api/chat',
+      body: {
+        systemMessage: systemMessage,
+      },
+    });
+  }, [systemMessage]);
+
+  const { messages, sendMessage, status, regenerate } = useChat({
+    transport,
+  });
   const { textInput } = usePromptInputController();
   const handleSubmit = async (message: { text: string; files: any[] }, e: React.FormEvent) => {
     if (message.text.trim()) {
@@ -26,8 +71,11 @@ const MessagePageContent = () => {
     }
   };
   return (
-    <div className="max-w-4xl mx-auto p-6 relative size-full rounded-lg border h-[600px]">
+    <div className="max-w-4xl mx-auto p-6 relative w-full h-full rounded-lg border">
       <div className="flex flex-col h-full">
+        <div className="flex justify-end mb-4">
+          <SystemMessage />
+        </div>
         <Conversation>
           <ConversationContent>
             {messages.map((message, messageIndex) => (
