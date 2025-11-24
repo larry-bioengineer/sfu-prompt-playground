@@ -22,6 +22,7 @@ import SystemMessage from '@/components/custom/SystemMessage/page';
 
 const STORAGE_KEY = 'system-message';
 
+
 const MessagePageContent = () => {
   // Get system message from localStorage and keep it in state
   const [systemMessage, setSystemMessage] = useState(() => {

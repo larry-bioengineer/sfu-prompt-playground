@@ -11,7 +11,7 @@ export const maxDuration = 30;
 
 export async function POST(req: Request) {
   const { messages, systemMessage }: { messages: UIMessage[]; systemMessage?: string } = await req.json();
-    console.log(systemMessage);
+    
     const result = streamText({
         model: openrouter.chat('x-ai/grok-4.1-fast:free'),
         system: systemMessage || 'You are a helpful assistant.',
