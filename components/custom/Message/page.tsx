@@ -20,8 +20,6 @@ import { DefaultChatTransport } from 'ai';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import SystemMessage from '@/components/custom/SystemMessage/page';
 
-const STORAGE_KEY = 'system-message';
-
 // Separate component that uses useChat - will remount when key changes
 const ChatInterface = ({ systemMessage }: { systemMessage: string }) => {
   // Create transport with system message in body
@@ -113,52 +111,82 @@ const ChatInterface = ({ systemMessage }: { systemMessage: string }) => {
   );
 };
 
-const MessagePageContent = () => {
-  // Get system message from localStorage and keep it in state
-  const [systemMessage, setSystemMessage] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(STORAGE_KEY) || '';
-    }
-    return '';
-  });
+const MessagePageContent = ({ chatId }: { chatId: string }) => {
+  const [systemMessage, setSystemMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Listen for storage changes to update system message
+  // Fetch system message from API on mount and when chatId changes
   useEffect(() => {
-    const handleStorageChange = () => {
-      if (typeof window !== 'undefined') {
-        setSystemMessage(localStorage.getItem(STORAGE_KEY) || '');
+    const fetchSystemMessage = async () => {
+      if (!chatId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const response = await fetch(`/api/system-message?chatId=${encodeURIComponent(chatId)}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch system message');
+        }
+
+        const data = await response.json();
+        setSystemMessage(data.message || '');
+      } catch (error) {
+        console.error('Error fetching system message:', error);
+        setSystemMessage('');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    // Listen for storage events (when localStorage is updated from another tab/window)
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also listen for custom events (when localStorage is updated in the same tab)
-    window.addEventListener('systemMessageUpdated', handleStorageChange);
+    fetchSystemMessage();
+  }, [chatId]);
+
+  // Listen for system message updates from SystemMessage component
+  useEffect(() => {
+    const handleSystemMessageUpdate = async () => {
+      if (!chatId) return;
+
+      try {
+        const response = await fetch(`/api/system-message?chatId=${encodeURIComponent(chatId)}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch system message');
+        }
+
+        const data = await response.json();
+        setSystemMessage(data.message || '');
+      } catch (error) {
+        console.error('Error fetching system message:', error);
+      }
+    };
+
+    window.addEventListener('systemMessageUpdated', handleSystemMessageUpdate);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('systemMessageUpdated', handleStorageChange);
+      window.removeEventListener('systemMessageUpdated', handleSystemMessageUpdate);
     };
-  }, []);
+  }, [chatId]);
 
   return (
     <div className="max-w-4xl mx-auto p-6 relative w-full h-full rounded-lg border">
       <div className="flex flex-col h-full">
         <div className="flex justify-end mb-4">
-          <SystemMessage />
+          <SystemMessage chatId={chatId} />
         </div>
         {/* Key prop forces remount when systemMessage changes, ensuring useChat uses new transport */}
-        <ChatInterface key={systemMessage} systemMessage={systemMessage} />
+        {!isLoading && <ChatInterface key={systemMessage} systemMessage={systemMessage} />}
       </div>
     </div>
   );
 };
 
-const MessagePage = () => {
+const MessagePage = ({ chatId }: { chatId: string }) => {
   return (
     <PromptInputProvider>
-      <MessagePageContent />
+      <MessagePageContent chatId={chatId} />
     </PromptInputProvider>
   );
 };

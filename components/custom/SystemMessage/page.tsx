@@ -7,8 +7,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 
-const STORAGE_KEY = 'system-message'
-
 interface ExamplePair {
   id: string
   user: string
@@ -56,49 +54,112 @@ function formatExamples(examples: ExamplePair[]): string {
   return `<examples>\n${examplesContent}\n</examples>`
 }
 
-export default function SystemMessage() {
+export default function SystemMessage({ chatId }: { chatId: string }) {
   const [open, setOpen] = useState(false)
   const [systemMessage, setSystemMessage] = useState('')
   const [examples, setExamples] = useState<ExamplePair[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Load system message from localStorage on mount and when dialog opens
+  // Load system message from API when dialog opens or chatId changes
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        setSystemMessage(extractBaseSystemMessage(stored))
-        setExamples(parseExamples(stored))
-      } else {
+    const fetchSystemMessage = async () => {
+      if (!open || !chatId) {
+        return
+      }
+
+      try {
+        setIsLoading(true)
+        const response = await fetch(`/api/system-message?chatId=${encodeURIComponent(chatId)}`)
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch system message')
+        }
+
+        const data = await response.json()
+        const storedMessage = data.message || ''
+        
+        setSystemMessage(extractBaseSystemMessage(storedMessage))
+        setExamples(parseExamples(storedMessage))
+      } catch (error) {
+        console.error('Error fetching system message:', error)
         setSystemMessage('')
         setExamples([])
+      } finally {
+        setIsLoading(false)
       }
     }
-  }, [open])
 
-  // Save system message to localStorage
-  const handleSave = () => {
-    if (typeof window !== 'undefined') {
+    fetchSystemMessage()
+  }, [open, chatId])
+
+  // Save system message to API
+  const handleSave = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    
+    if (!chatId) return
+
+    try {
       const baseMessage = systemMessage.trim()
       const examplesXml = formatExamples(examples)
       const fullMessage = examplesXml 
         ? `${baseMessage}\n\n${examplesXml}` 
         : baseMessage
       
-      localStorage.setItem(STORAGE_KEY, fullMessage)
+      const response = await fetch('/api/system-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chatId: chatId,
+          message: fullMessage,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save system message')
+      }
+
       // Dispatch custom event to notify other components
       window.dispatchEvent(new Event('systemMessageUpdated'))
+      // Close dialog after successful save
       setOpen(false)
+    } catch (error) {
+      console.error('Error saving system message:', error)
+      alert('Failed to save system message. Please try again.')
+      // Don't close dialog on error
     }
   }
 
-  // Clear system message from localStorage
-  const handleClear = () => {
-    setSystemMessage('')
-    setExamples([])
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY)
+  // Clear system message from API
+  const handleClear = async () => {
+    if (!chatId) return
+
+    try {
+      // Save empty message to clear it
+      const response = await fetch('/api/system-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chatId: chatId,
+          message: '',
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to clear system message')
+      }
+
+      setSystemMessage('')
+      setExamples([])
       // Dispatch custom event to notify other components
       window.dispatchEvent(new Event('systemMessageUpdated'))
+    } catch (error) {
+      console.error('Error clearing system message:', error)
+      alert('Failed to clear system message. Please try again.')
     }
   }
 
@@ -131,7 +192,7 @@ export default function SystemMessage() {
         System Message
       </Button>
 
-      <Dialog open={open} onClose={setOpen} className="relative z-10">
+      <Dialog open={open} onClose={(value) => setOpen(value)} className="relative z-10">
         <DialogBackdrop
           transition
           className="fixed inset-0 bg-gray-500/75 transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in dark:bg-gray-900/50"
@@ -279,7 +340,10 @@ export default function SystemMessage() {
                 </Button>
                 <Button
                   type="button"
-                  onClick={handleSave}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    handleSave(e)
+                  }}
                   className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white dark:bg-indigo-500 dark:hover:bg-indigo-400"
                 >
                   Save
